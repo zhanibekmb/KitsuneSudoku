@@ -1,0 +1,28 @@
+# ── Dependencies ──────────────────────────────────────────
+node_modules/
+
+# ── Build output ──────────────────────────────────────────
+dist/
+
+# ── Environment / Secrets — NEVER commit these ────────────
+.env
+.env.local
+.env.production
+.env.*.local
+
+# ── Firebase config with real keys ────────────────────────
+firebase-applet-config.json
+
+# ── Logs ──────────────────────────────────────────────────
+*.log
+npm-debug.log*
+
+# ── Editor ────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ── OS ────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db

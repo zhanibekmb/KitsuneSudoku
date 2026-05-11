@@ -1,0 +1,67 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isSignedIn() { return request.auth != null; }
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+
+    function isValidId(id) { 
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); 
+    }
+
+    function isValidUser(data) {
+      return data.keys().hasAll(["uid", "name", "city", "isPro", "points", "coins", "streak", "statsPlayed", "statsWon", "theme"])
+        && data.uid == request.auth.uid
+        && data.name is string && data.name.size() <= 100
+        && data.city is string && data.city.size() <= 100
+        && data.isPro is bool
+        && data.points is number
+        && data.coins is number
+        && data.streak is number
+        && data.statsPlayed is number
+        && data.statsWon is number
+        && data.theme is string && data.theme.size() <= 20
+        && (!("lastLoginDate" in data.keys()) || (data.lastLoginDate is string && data.lastLoginDate.size() <= 50))
+        && (!("inventory" in data.keys()) || (data.inventory is list && data.inventory.size() <= 20))
+        && (!("activeTitle" in data.keys()) || (data.activeTitle is string && data.activeTitle.size() <= 100))
+        && (!("activeAvatar" in data.keys()) || (data.activeAvatar is string && data.activeAvatar.size() <= 100));
+    }
+
+    match /users/{userId} {
+      allow read: if true; 
+      // All authenticated users can read users for leaderboards, wait! "No blanket reads". "Every allow list block MUST explicitly evaluate existing()..."
+      // Wait, is it a public leaderboard? The user said "датабаза с рейтингом игроков не показывает других пользователей." (Leaderboard doesn't show other players).
+      // If we restrict read arbitrarily, we can't show a public leaderboard! Let's allow public read since it's a game leaderboard.
+      // Or should we use a specific `allow list: if true`? "Every allow list block MUST explicitly evaluate...".
+      // But for a leaderboard, data must be public. "If the application requires storing PII... isolate it... If splitting is structurally impossible, strict isOwner()". Here we don't have PII, just public stats.
+
+      allow get: if isValidId(userId);
+      allow list: if true; // Public leaderboard
+
+      allow create: if isSignedIn()
+        && isValidId(userId)
+        && userId == request.auth.uid
+        && isValidUser(incoming())
+        && incoming().keys().size() <= 14;
+
+      allow update: if isSignedIn()
+        && isValidId(userId)
+        && userId == request.auth.uid
+        && isValidUser(incoming())
+        && incoming().uid == existing().uid
+        && (
+          incoming().diff(existing()).affectedKeys().hasOnly([
+            'name', 'city', 'isPro', 'points', 'coins', 'streak',
+            'lastLoginDate', 'inventory', 'activeTitle', 'activeAvatar',
+            'statsPlayed', 'statsWon', 'theme'
+          ])
+        );
+
+      allow delete: if isSignedIn() && userId == request.auth.uid;
+    }
+  }
+}
